@@ -1,0 +1,80 @@
+name: AI Codegen (comment-triggered)
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+permissions:
+  contents: write          # új branch + commit
+  pull-requests: write     # PR nyitása
+  issues: read             # komment tartalom olvasása
+
+concurrency:
+  group: ai-codegen-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    if: contains(github.event.comment.body, '/ai-generate')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install OpenAI SDK
+        run: |
+          python -m pip install --upgrade pip
+          pip install openai
+
+      - name: Extract spec from comment
+        id: spec
+        run: |
+          # A teljes komment:
+          echo "FULL_COMMENT<<'EOF'" >> $GITHUB_OUTPUT
+          echo "${{ github.event.comment.body }}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          # A trigger eltávolítása, a maradék a specifikáció:
+          SPEC="$(echo "${{ github.event.comment.body }}" | sed 's#^/ai-generate[ ]*##')"
+          echo "SPEC<<'EOF'" >> $GITHUB_OUTPUT
+          echo "$SPEC" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Run AI code generation
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python .github/scripts/ai_codegen.py \
+            --spec "${{ steps.spec.outputs.SPEC }}" \
+            --outdir "ai_output"
+
+      - name: Prepare branch
+        run: |
+          TS=$(date +%Y%m%d-%H%M%S)
+          BRANCH="ai/gen-${TS}"
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+          git checkout -b "$BRANCH"
+          rsync -a ai_output/ ./
+          git add -A
+          git -c user.name="aibot" -c user.email="aibot@users.noreply.github.com" \
+            commit -m "AI codegen: ${TS}"
+
+      - name: Push branch
+        run: |
+          git push -u origin "$BRANCH"
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Ha gh CLI nincs, GitHub hosted runneren jellemzően van; alternatíva: curl a REST-hez
+          gh pr create \
+            --title "AI codegen - ${GITHUB_REF_NAME:-spec}" \
+            --body "Automatikusan generált kód a következő specifikáció alapján:\n\n${{ steps.spec.outputs.SPEC }}" \
+            --head "$BRANCH"
