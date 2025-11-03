@@ -1,0 +1,43 @@
+name: AI Code Generator
+
+on:
+  issue_comment:
+    types: [created]
+
+# Engedélyek megadása a workflow-nak, hogy írhasson a repóba (branch, PR)
+permissions:
+  contents: write
+  pull-requests: write
+  issues: read
+
+jobs:
+  generate_code:
+    runs-on: ubuntu-latest
+    # Csak akkor fusson, ha a komment tartalmazza a trigger-szót
+    if: contains(github.event.comment.body, '/generate')
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install openai
+
+      - name: Run AI Code Generation Script
+        env:
+          # A repó Secretjeiből olvassa az API kulcsot
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }} 
+          
+          # A beépített GitHub Token használata, ami a 'permissions' blokk miatt működni fog
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          
+          # Átadjuk a szükséges kontextust a szkriptnek
+          REPO_NAME: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: python .github/scripts/ai_codegen.py
