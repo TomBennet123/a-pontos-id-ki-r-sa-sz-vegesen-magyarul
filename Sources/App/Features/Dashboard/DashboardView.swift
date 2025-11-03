@@ -6,6 +6,17 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    insightSection
+                    upcomingRoutineSection
+                }
+                .padding()
+            }
+            .navigationTitle("Gym")
+            .toolbar {
+                Button(action: { Task { await viewModel.refresh() } }) {
+                    Image(systemName: "arrow.clockwise")
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 24) {
                     insightSection
@@ -30,6 +41,19 @@ struct DashboardView: View {
     }
 
     private var insightSection: some View {
+        GroupBox("AI Edző") {
+            if let insight = viewModel.latestInsight {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(insight.motivationText)
+                        .font(.headline)
+                    Text(insight.recommendationText)
+                        .font(.subheadline)
+                    TagCloud(tags: insight.tags)
+                }
+            } else {
+                Text("Még nincs értékelés. Rögzíts egy edzést!")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
         GymCard(title: "AI Edző", icon: "brain.head.profile") {
             if let insight = viewModel.latestInsight {
                 VStack(alignment: .leading, spacing: 12) {
@@ -54,6 +78,58 @@ struct DashboardView: View {
     }
 
     private var upcomingRoutineSection: some View {
+        GroupBox("Következő edzés") {
+            if let routine = viewModel.upcomingRoutine {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(routine.name)
+                        .font(.headline)
+                    Text(routine.description)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Divider()
+                    ForEach(routine.dayPlans) { day in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(day.name)
+                                .font(.title3.bold())
+                            Text(day.muscleFocus.map(\.localizedName).joined(separator: ", "))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 8)
+                    }
+                }
+            } else {
+                Text("Az AI Edző a legutóbbi teljesítmény alapján készíti el a következő edzésedet.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+private struct TagCloud: View {
+    let tags: [AIInsight.InsightKind]
+
+    var body: some View {
+        FlowLayout(spacing: 8) {
+            ForEach(tags, id: \.self) { tag in
+                Text(tagLabel(tag))
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.accentColor.opacity(0.1)))
+            }
+        }
+    }
+
+    private func tagLabel(_ tag: AIInsight.InsightKind) -> String {
+        switch tag {
+        case .motivation: return "Motiváció"
+        case .recommendation: return "Ajánlás"
+        case .warning: return "Figyelmeztetés"
+        case .deloadSuggestion: return "Deload"
+        }
+    }
         GymCard(title: "Következő edzés", icon: "calendar") {
             if let routine = viewModel.upcomingRoutine {
                 VStack(alignment: .leading, spacing: 16) {

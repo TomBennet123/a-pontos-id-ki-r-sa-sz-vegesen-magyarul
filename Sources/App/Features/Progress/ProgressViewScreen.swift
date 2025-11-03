@@ -6,6 +6,35 @@ struct ProgressViewScreen: View {
 
     var body: some View {
         NavigationStack {
+            List {
+                if let summary = viewModel.summary {
+                    Section("Összkép") {
+                        ProgressSummaryRow(title: "Edzések", value: "\(summary.workoutCount)")
+                        ProgressSummaryRow(title: "Teljes volumen", value: "\(Int(summary.totalVolume)) kg")
+                        ProgressSummaryRow(title: "Átlag intenzitás", value: String(format: "%.1f kg/szett", summary.averageIntensity))
+                        if let weight = summary.latestWeight {
+                            ProgressSummaryRow(title: "Legfrissebb testsúly", value: String(format: "%.1f kg", weight))
+                        }
+                    }
+
+                    Section("Izomcsoport eloszlás") {
+                        ForEach(summary.volumeByMuscleGroup.sorted(by: { $0.key.localizedName < $1.key.localizedName }), id: \.key) { entry in
+                            HStack {
+                                Text(entry.key.localizedName)
+                                Spacer()
+                                Text("\(Int(entry.value)) kg")
+                            }
+                        }
+                    }
+                } else {
+                    ContentUnavailableView("Nincs adat", systemImage: "chart.bar", description: Text("Rögzíts edzéseket a statisztikákhoz."))
+                }
+            }
+            .navigationTitle("Haladás")
+            .toolbar {
+                Button(action: { Task { await viewModel.refresh() } }) {
+                    Image(systemName: "arrow.clockwise")
+                }
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 24) {
                     if let summary = viewModel.summary {

@@ -58,6 +58,7 @@ public struct Exercise: Identifiable, Hashable, Codable {
         kind: Kind,
         primaryMuscles: [MuscleGroup],
         secondaryMuscles: [MuscleGroup] = [],
+        instructions: String? = nil
         instructions: String? = nil,
         guidance: Guidance? = nil
     ) {
