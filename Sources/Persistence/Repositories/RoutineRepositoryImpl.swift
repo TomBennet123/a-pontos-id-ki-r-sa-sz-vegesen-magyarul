@@ -11,6 +11,7 @@ public final class RoutineRepositoryImpl: RoutineRepository {
         self.dbQueue = dbQueue
         encoder.dateEncodingStrategy = .iso8601
         decoder.dateDecodingStrategy = .iso8601
+        seedDefaultRoutineIfNeeded()
     }
 
     public func routines() async throws -> [Routine] {
@@ -36,6 +37,21 @@ public final class RoutineRepositoryImpl: RoutineRepository {
             let data = try encoder.encode(routine)
             try db.execute(sql: "REPLACE INTO routine (id, name, description, createdAt, updatedAt, source, payload) VALUES (?, ?, ?, ?, ?, ?, ?)",
                            arguments: [routine.id.uuidString, routine.name, routine.description, routine.createdAt, routine.updatedAt, routine.source.rawValue, data])
+        }
+    }
+
+    private func seedDefaultRoutineIfNeeded() {
+        do {
+            try dbQueue.write { db in
+                let existingCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM routine") ?? 0
+                guard existingCount == 0 else { return }
+                let routine = GymSampleData.sampleRoutine
+                let data = try encoder.encode(routine)
+                try db.execute(sql: "INSERT INTO routine (id, name, description, createdAt, updatedAt, source, payload) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                               arguments: [routine.id.uuidString, routine.name, routine.description, routine.createdAt, routine.updatedAt, routine.source.rawValue, data])
+            }
+        } catch {
+            print("Routine seed failed: \(error)")
         }
     }
 }
